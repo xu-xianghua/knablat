@@ -12,6 +12,8 @@ The default mesh format is OpenFOAM mesh format. It can be converted from other 
 
 And it is possible to write another mesh importer for other mesh formats. The default mesh importer is defined in ofmesh.py.
 
+An ansys mesh(.msh) importer is provided in ansysmesh.py, which is modified from [meshio](https://github.com/nschloe/meshio).
+
 ### Boundary condition
 
 It supports the following boundary conditions.
@@ -57,12 +59,12 @@ Demo code for setting boundary condition:
 ```python
     def set_boundary(self):
         """ set boundaries """
-        self.mesh.boundary[b'bot_wall'].type = "constant"
-        self.mesh.boundary[b'bot_wall'].value = 280.
-        self.mesh.boundary[b'side_wall'].type = "convection"
-        self.mesh.boundary[b'side_wall'].value = (1e4, 280.)
-        self.mesh.boundary[b'hot_wall'].type = "fixedFlux"
-        self.mesh.boundary[b'hot_wall'].value = 100000.
+        self.mesh.boundary['bot_wall'].type = "constant"
+        self.mesh.boundary['bot_wall'].value = 280.
+        self.mesh.boundary['side_wall'].type = "convection"
+        self.mesh.boundary['side_wall'].value = (1e4, 280.)
+        self.mesh.boundary['hot_wall'].type = "fixedFlux"
+        self.mesh.boundary['hot_wall'].value = 100000.
 ```
 
 ### define the specific solver
@@ -81,10 +83,10 @@ The main code is as follows:
 
 ```python
 import sys
-import time
 import numpy as np
 from knablat.solver import Solver
 from knablat.ofmesh import read_of_mesh
+from knablat.ansysmesh import read_ans_mesh
 
 class TestSolver(Solver):
     """ class TestSolver """
@@ -93,40 +95,38 @@ class TestSolver(Solver):
         
     def read_mesh(self, path: str):
         """ read mesh """
-        self.mesh = read_of_mesh(path)
+        if path.endswith('.msh'):
+            self.mesh = read_ans_mesh(path)
+        else:
+            self.mesh = read_of_mesh(path)
         self.mesh.setup()
         
     def set_boundary(self):
         """ set boundaries """
-        self.mesh.boundary[b'bot_wall'].type = "constant"
-        self.mesh.boundary[b'bot_wall'].value = 280.
-        self.mesh.boundary[b'hot_wall'].type = "fixedFlux"
-        self.mesh.boundary[b'hot_wall'].value = 100000.
+        self.mesh.boundary['bot_wall'].type = "constant"
+        self.mesh.boundary['bot_wall'].value = 280.
+        self.mesh.boundary['hot_wall'].type = "fixedFlux"
+        self.mesh.boundary['hot_wall'].value = 100000.
         
     def show_result(self, cross_diffusion: bool=False):
         """ show result """
-        T_hot = (sum([fc.node.T*np.linalg.norm(fc.normal) for fc in self.mesh.boundary[b'hot_wall'].faces]) 
-                 / sum([np.linalg.norm(fc.normal) for fc in self.mesh.boundary[b'hot_wall'].faces]))
+        T_hot = (sum([fc.node.T*np.linalg.norm(fc.normal) for fc in self.mesh.boundary['hot_wall'].faces]) 
+                 / sum([np.linalg.norm(fc.normal) for fc in self.mesh.boundary['hot_wall'].faces]))
         print(f'mean T_hot: {T_hot}')
         T_node_mean = sum([nd.T*nd.C for nd in self.inner_nodes]) / sum([nd.C for nd in self.inner_nodes])
         print(f'mean T_node: {T_node_mean}')
-        Qin = self.acct_heat_flux(b'hot_wall', cross_diffusion)
+        Qin = self.acct_heat_flux('hot_wall', cross_diffusion)
         print(f'Qin: {Qin}')
-        Qout = self.acct_heat_flux(b'bot_wall', cross_diffusion)
+        Qout = self.acct_heat_flux('bot_wall', cross_diffusion)
         print(f'Qout: {Qout}')
       
       
-def test_solver(path: str, direct=False, method='spsolve', least_square=False):
+def test_solver(path: str, direct=False, method='spsolve', least_square=True):
     """ test solver """  
-    t0 = time.time()
     solver = TestSolver()
     solver.read_mesh(path)
-    t1 = time.time()
-    print(f'read mesh time: {t1-t0} s')
     solver.set_boundary()
     solver.setup_network(1., 1., 10., 300.)
-    t2 = time.time()
-    print(f'setup network time: {t2-t1} s')
     if direct:
         solver.solve_linear(method, use_umfpack=True)
     else:
@@ -134,11 +134,7 @@ def test_solver(path: str, direct=False, method='spsolve', least_square=False):
                                  use_cholesky=(method == 'cholesky'), 
                                  least_square=least_square,
                                  relax=0.99)
-    t3 = time.time()
-    print(f'method: {method}, time: {t3-t2} s')
-    solver.show_result(not direct)
-    print(f'total time: {t3-t0} s')
-    
+    solver.show_result(not direct)    
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:
