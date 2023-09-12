@@ -119,9 +119,10 @@ class Cell:
         
 class CellBlock:
     """ class CellBlock, a cell block is composed of cells """
-    def __init__(self, cells: List[Cell], id: int = None, label: str=None):
+    def __init__(self, cells: List[Cell], id: int = None, type: str=None, label: str=None):
         self.cells = cells
         self.id = id
+        self.type = type
         self.label = label
         
     def setup(self):
