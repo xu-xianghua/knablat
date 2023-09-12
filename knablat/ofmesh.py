@@ -36,9 +36,9 @@ def read_of_mesh(path: str) -> Mesh:
     boundary_dict = {}
     n = 0
     for k, v in boundary.items():
-        for i in range(v.start, v.start + v.num):
-            faces[i].boundary_type = v.type
-            faces[i].is_boundary = True
+        # if k is bytes, convert to str
+        if isinstance(k, bytes):
+            k = k.decode('utf-8')
         boundary_dict[k] = Boundary(n, faces[v.start:v.start+v.num], v.type, k)
         n += 1
             
