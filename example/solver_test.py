@@ -7,6 +7,7 @@ import time
 import numpy as np
 from knablat.solver import Solver
 from knablat.ofmesh import read_of_mesh
+from knablat.ansysmesh import read_ans_mesh
 
 class TestSolver(Solver):
     """ class TestSolver """
@@ -15,32 +16,35 @@ class TestSolver(Solver):
         
     def read_mesh(self, path: str):
         """ read mesh """
-        self.mesh = read_of_mesh(path)
+        # if path is .msh file, read ansys mesh
+        if path.endswith('.msh'):
+            self.mesh = read_ans_mesh(path)
+        else:
+            self.mesh = read_of_mesh(path)
         self.mesh.setup()
         
     def set_boundary(self):
         """ set boundaries """
-        self.mesh.boundary[b'bot_wall'].type = "constant"
-        self.mesh.boundary[b'bot_wall'].value = 280.
-        # self.mesh.boundary[b'bot_wall'].type = "convection"
-        # self.mesh.boundary[b'bot_wall'].value = (1e4, 280.)
-        self.mesh.boundary[b'hot_wall'].type = "fixedFlux"
-        self.mesh.boundary[b'hot_wall'].value = 100000.
-        # self.mesh.boundary[b'hot_wall'].type = "constant"
-        # self.mesh.boundary[b'hot_wall'].value = 350.
+        self.mesh.boundary['bot_wall'].type = "constant"
+        self.mesh.boundary['bot_wall'].value = 280.
+        # self.mesh.boundary['bot_wall'].type = "convection"
+        # self.mesh.boundary['bot_wall'].value = (1e4, 280.)
+        # self.mesh.boundary['hot_wall'].type = "fixedFlux"
+        # self.mesh.boundary['hot_wall'].value = 100000.
+        self.mesh.boundary['hot_wall'].type = "constant"
+        self.mesh.boundary['hot_wall'].value = 350.
         
     def show_result(self, cross_diffusion: bool=False):
         """ show result """
-        T_hot = (sum([fc.node.T*np.linalg.norm(fc.normal) for fc in self.mesh.boundary[b'hot_wall'].faces]) 
-                 / sum([np.linalg.norm(fc.normal) for fc in self.mesh.boundary[b'hot_wall'].faces]))
+        T_hot = (sum([fc.node.T*np.linalg.norm(fc.normal) for fc in self.mesh.boundary['hot_wall'].faces]) 
+                 / sum([np.linalg.norm(fc.normal) for fc in self.mesh.boundary['hot_wall'].faces]))
         print(f'mean T_hot: {T_hot}')
         T_node_mean = sum([nd.T*nd.C for nd in self.inner_nodes]) / sum([nd.C for nd in self.inner_nodes])
         print(f'mean T_node: {T_node_mean}')
-        Qin = self.acct_heat_flux(b'hot_wall', cross_diffusion)
+        Qin = self.acct_heat_flux('hot_wall', cross_diffusion)
         print(f'Qin: {Qin}')
-        Qout = self.acct_heat_flux(b'bot_wall', cross_diffusion)
+        Qout = self.acct_heat_flux('bot_wall', cross_diffusion)
         print(f'Qout: {Qout}')
-        print(f'total volume: {self.mesh.total_volume()}')
       
       
 def test_solver(path: str, direct=False, method='spsolve', least_square=False):
